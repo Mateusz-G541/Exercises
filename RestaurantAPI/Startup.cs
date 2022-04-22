@@ -35,7 +35,9 @@ namespace RestaurantAPI
 
             //adding auto mapping
             services.AddAutoMapper(this.GetType().Assembly);
+            //add services for every entity
             services.AddScoped<IRestaurantService, RestaurantService>();
+            services.AddScoped<IDishService, DishService>();
 
             //adding middleware error handler
             services.AddScoped<ErrorHandlingMiddleware>();

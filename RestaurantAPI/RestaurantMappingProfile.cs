@@ -23,7 +23,10 @@ namespace RestaurantAPI
                  }));
 
             CreateMap<UpdateRestaurantDto, Restaurant>();
-                
+
+            //fields are the same
+            CreateMap<CreateDishDto, Dish>();
+
 
 
 
