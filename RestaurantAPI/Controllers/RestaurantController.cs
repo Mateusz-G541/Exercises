@@ -61,9 +61,9 @@ namespace RestaurantAPI.Controllers
         }
         [HttpGet]
         [Authorize(Policy = "AtLeast20")]
-        public ActionResult<IEnumerable<RestaurantDto>> GetAll([FromQuery] string searchPhrase)
+        public ActionResult<IEnumerable<RestaurantDto>> GetAll([FromQuery] RestaurantQuery restaurantQuery)
         {
-            var restaurantsDtos = _restaurantService.GetAll(searchPhrase);
+            var restaurantsDtos = _restaurantService.GetAll(restaurantQuery);
             return Ok(restaurantsDtos);
         }
         [HttpGet("{id}")]

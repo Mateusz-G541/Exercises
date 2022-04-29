@@ -10,13 +10,15 @@ using RestaurantAPI.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 using RestaurantAPI.Authorization;
+using System.Linq.Expressions;
+using System;
 
 namespace RestaurantAPI.Services
 {
     public interface IRestaurantService
     {
         RestaurantDto GetById(int id);
-        IEnumerable<RestaurantDto> GetAll(string searchPhrase);
+        PagedResult<RestaurantDto> GetAll(RestaurantQuery restaurantQuery);
         int Create(CreateRestaurantDto dto);
         void Delete(int id);
         void Update(int id, UpdateRestaurantDto dto);
@@ -40,7 +42,7 @@ namespace RestaurantAPI.Services
         }
         public void Update(int id, UpdateRestaurantDto dto)
         {
-          
+
             var restaurant = _dbContext
                         .Restaurants
                         .FirstOrDefault(r => r.Id == id);
@@ -51,7 +53,7 @@ namespace RestaurantAPI.Services
 
             var authorizationResult = _authorizationService.AuthorizeAsync(_userContextService.User, restaurant, new ResourceOperationRequirment(ResourceOperation.Update)).Result;
 
-            if(!authorizationResult.Succeeded)
+            if (!authorizationResult.Succeeded)
             {
                 throw new ForbidException();
             }
@@ -98,16 +100,41 @@ namespace RestaurantAPI.Services
             return result;
         }
 
-        public IEnumerable<RestaurantDto> GetAll(string searchPhrase)
+        public PagedResult<RestaurantDto> GetAll(RestaurantQuery restaurantQuery)
         {
-            var restaurants = _dbContext
+
+            var baseQuery = _dbContext
                   .Restaurants
                   .Include(r => r.Address)
                   .Include(r => r.Dishes)
-                  .Where(r => searchPhrase == null || ( r.Name.ToLower().Contains(searchPhrase.ToLower()) || r.Description.ToLower().Contains(searchPhrase.ToLower())))
+                  .Where(r => restaurantQuery.SearchPhrase == null || (r.Name.ToLower().Contains(restaurantQuery.SearchPhrase.ToLower()) || r.Description.ToLower().Contains(restaurantQuery.SearchPhrase.ToLower())));
+
+            if (string.IsNullOrEmpty(restaurantQuery.SortBy))
+            {
+                var columnsSelector = new Dictionary<string, Expression<Func<Restaurant, object>>>
+                {
+                    {nameof(Restaurant.Name), r => r.Name },
+                    {nameof(Restaurant.Description), r => r.Description },
+                    {nameof(Restaurant.Category), r => r.Category }
+
+                };
+                var selectedColumn = columnsSelector[restaurantQuery.SortBy];
+                baseQuery = restaurantQuery.SortDirection == SortDirection.Ascending ?
+                    baseQuery.OrderBy(selectedColumn)
+                    : baseQuery.OrderByDescending(selectedColumn);
+            }
+
+            var restaurants = baseQuery
+                 .Skip(restaurantQuery.PageSize * (restaurantQuery.PageNumber - 1))
+                 .Take(restaurantQuery.PageSize)
                   .ToList();
+
+            var totalItemsCount = baseQuery.Count();
+
             var restaurantsDtos = _mapper.Map<List<RestaurantDto>>(restaurants);
-            return restaurantsDtos;
+
+            var result = new PagedResult<RestaurantDto>(restaurantsDtos, totalItemsCount, restaurantQuery.PageSize, restaurantQuery.PageNumber);
+            return result;
 
         }
 
