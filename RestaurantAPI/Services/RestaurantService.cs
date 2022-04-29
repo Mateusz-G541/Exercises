@@ -16,10 +16,10 @@ namespace RestaurantAPI.Services
     public interface IRestaurantService
     {
         RestaurantDto GetById(int id);
-        IEnumerable<RestaurantDto> GetAll();
-        int Create(CreateRestaurantDto dto, int userId);
-        void Delete(int id, ClaimsPrincipal user);
-        void Update(int id, UpdateRestaurantDto dto, ClaimsPrincipal user);
+        IEnumerable<RestaurantDto> GetAll(string searchPhrase);
+        int Create(CreateRestaurantDto dto);
+        void Delete(int id);
+        void Update(int id, UpdateRestaurantDto dto);
     }
 
     public class RestaurantService : IRestaurantService
@@ -28,16 +28,17 @@ namespace RestaurantAPI.Services
         private readonly IMapper _mapper;
         private readonly ILogger _logger;
         private readonly IAuthorizationService _authorizationService;
+        private readonly IUserContextService _userContextService;
 
 
-        public RestaurantService(RestaurantDBContext dbContext, IMapper mapper, ILogger<RestaurantService> logger, IAuthorizationService authorizationService)
+        public RestaurantService(RestaurantDBContext dbContext, IMapper mapper, ILogger<RestaurantService> logger, IAuthorizationService authorizationService, IUserContextService userContextService)
         {
             _dbContext = dbContext;
             _mapper = mapper;
             _logger = logger;
             _authorizationService = authorizationService;
         }
-        public void Update(int id, UpdateRestaurantDto dto, ClaimsPrincipal user)
+        public void Update(int id, UpdateRestaurantDto dto)
         {
           
             var restaurant = _dbContext
@@ -48,7 +49,7 @@ namespace RestaurantAPI.Services
                 throw new NotFoundException("Restaurant not found");
             }
 
-            var authorizationResult = _authorizationService.AuthorizeAsync(user, restaurant, new ResourceOperationRequirment(ResourceOperation.Update)).Result;
+            var authorizationResult = _authorizationService.AuthorizeAsync(_userContextService.User, restaurant, new ResourceOperationRequirment(ResourceOperation.Update)).Result;
 
             if(!authorizationResult.Succeeded)
             {
@@ -61,7 +62,7 @@ namespace RestaurantAPI.Services
             _dbContext.SaveChanges();
 
         }
-        public void Delete(int id, ClaimsPrincipal user)
+        public void Delete(int id)
         {
             _logger.LogWarning($"Restaurant with id: {id} DELETE action invoked");
             _logger.LogError($"Nlog config error catching test");
@@ -73,7 +74,7 @@ namespace RestaurantAPI.Services
                 throw new NotFoundException("Restaurant not found");
             }
 
-            var authorizationResult = _authorizationService.AuthorizeAsync(user, restaurant, new ResourceOperationRequirment(ResourceOperation.Delete)).Result;
+            var authorizationResult = _authorizationService.AuthorizeAsync(_userContextService.User, restaurant, new ResourceOperationRequirment(ResourceOperation.Delete)).Result;
 
             if (!authorizationResult.Succeeded)
             {
@@ -97,22 +98,23 @@ namespace RestaurantAPI.Services
             return result;
         }
 
-        public IEnumerable<RestaurantDto> GetAll()
+        public IEnumerable<RestaurantDto> GetAll(string searchPhrase)
         {
             var restaurants = _dbContext
                   .Restaurants
                   .Include(r => r.Address)
                   .Include(r => r.Dishes)
+                  .Where(r => searchPhrase == null || ( r.Name.ToLower().Contains(searchPhrase.ToLower()) || r.Description.ToLower().Contains(searchPhrase.ToLower())))
                   .ToList();
             var restaurantsDtos = _mapper.Map<List<RestaurantDto>>(restaurants);
             return restaurantsDtos;
 
         }
 
-        public int Create(CreateRestaurantDto dto, int userId)
+        public int Create(CreateRestaurantDto dto)
         {
             var restaurant = _mapper.Map<Restaurant>(dto);
-            restaurant.CreatedById = userId;
+            restaurant.CreatedById = _userContextService.GetUserId;
             _dbContext.Restaurants.Add(restaurant);
             _dbContext.SaveChanges();
             return restaurant.Id;

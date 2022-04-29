@@ -87,7 +87,8 @@ namespace RestaurantAPI
 
             //adding middleware timer
             services.AddScoped<RequestTimeMiddleware>();
-
+            services.AddScoped<IUserContextService, UserContextService>();
+            services.AddHttpContextAccessor();
             //generating API documentation by swagger
             services.AddSwaggerGen();
         }
